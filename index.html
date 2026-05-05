@@ -110,6 +110,11 @@
         });
         $prompt.addEventListener('keydown', e => { if (e.key === 'Enter') generate(); });
 
+        // Disable generation on GitHub Pages since there is no backend
+        if (window.location.hostname.includes("github.io")) {
+            document.getElementById('ui').style.display = 'none';
+        }
+
         // Deep-link: ?npc=<name> loads a previously generated NPC's metadata
         // and renders it without re-running the agent. Browsers may block
         // autoplay on cold loads — first click anywhere unsticks it.
@@ -118,7 +123,7 @@
             $status.textContent = `Loading ${npcParam}...`;
             
             // If the npcParam doesn't contain a directory prefix, try 01-model first for backwards compatibility
-            const fetchPath = npcParam.includes('/') ? `/models/${npcParam}.json` : `/models/01-model/${npcParam}.json`;
+            const fetchPath = npcParam.includes('/') ? `models/${npcParam}.json` : `models/01-model/${npcParam}.json`;
             
             fetch(fetchPath)
                 .then(async r => {
@@ -126,7 +131,7 @@
                     
                     // Fallback to root models dir if 01-model failed just in case
                     if (!npcParam.includes('/')) {
-                        const fallbackRes = await fetch(`/models/${npcParam}.json`);
+                        const fallbackRes = await fetch(`models/${npcParam}.json`);
                         if (fallbackRes.ok) return fallbackRes.json();
                     }
                     return Promise.reject(`HTTP ${r.status}`);

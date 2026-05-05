@@ -121,9 +121,9 @@ def build_3d_model(name: str, bpy_script: str) -> str:
     final = out_dir / f"{name}.glb"
     tmp_glb.replace(final)
     _results["name"] = name
-    _results["glb_url"] = f"/models/{prefixed_dir}/{name}.glb"
+    _results["glb_url"] = f"models/{prefixed_dir}/{name}.glb"
     _results["dir_name"] = prefixed_dir
-    return f"OK: built /models/{prefixed_dir}/{name}.glb"
+    return f"OK: built models/{prefixed_dir}/{name}.glb"
 
 
 @beta_tool
@@ -153,7 +153,7 @@ def synthesize_voice_lines(name: str, voice_id: str, lines: list[dict]) -> str:
         audio.append({
             "id": line["id"],
             "text": line["text"],
-            "url": f"/models/{prefixed_dir}/{name}_{line['id']}.mp3",
+            "url": f"models/{prefixed_dir}/{name}_{line['id']}.mp3",
         })
     _results["audio"] = audio
     return f"OK: synthesized {len(audio)} lines."
