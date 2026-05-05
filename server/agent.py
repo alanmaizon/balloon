@@ -1,11 +1,13 @@
 """
-NPC Chatter agent loop.
+Balloon agent loop.
 
 Single Anthropic SDK call with tool use. Claude receives a character
 description, calls two tools (build_3d_model, synthesize_voice_lines), and the
 orchestrator returns URLs for the resulting .glb and .mp3 files.
 """
+import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -76,6 +78,16 @@ If `build_3d_model` returns an "ERROR:" string, fix the script and retry the too
 _results: dict = {}
 
 
+def _next_index() -> int:
+    """Highest existing NN- prefix in /models, plus one. 1 if none exist."""
+    indices = [
+        int(m.group(1))
+        for f in MODELS_DIR.glob("*")
+        if (m := re.match(r"^(\d+)-", f.name)) and f.is_dir()
+    ]
+    return max(indices) + 1 if indices else 1
+
+
 @beta_tool
 def build_3d_model(name: str, bpy_script: str) -> str:
     """Run a bpy script in headless Blender, producing /models/{name}.glb.
@@ -87,6 +99,10 @@ def build_3d_model(name: str, bpy_script: str) -> str:
     Returns:
         Confirmation string on success, or an "ERROR: ..." string Claude can retry on.
     """
+    prefixed_dir = f"{_results['index']:02d}-model"
+    out_dir = MODELS_DIR / prefixed_dir
+    out_dir.mkdir(exist_ok=True)
+    
     script_path = Path(f"/tmp/{name}_build.py")
     tmp_glb = Path(f"/tmp/{name}.glb")
     script_path.write_text(bpy_script)
@@ -102,10 +118,12 @@ def build_3d_model(name: str, bpy_script: str) -> str:
             f"stderr (last 500 chars):\n{result.stderr[-500:]}"
         )
 
-    final = MODELS_DIR / f"{name}.glb"
+    final = out_dir / f"{name}.glb"
     tmp_glb.replace(final)
-    _results["glb_url"] = f"/models/{name}.glb"
-    return f"OK: built /models/{name}.glb"
+    _results["name"] = name
+    _results["glb_url"] = f"/models/{prefixed_dir}/{name}.glb"
+    _results["dir_name"] = prefixed_dir
+    return f"OK: built /models/{prefixed_dir}/{name}.glb"
 
 
 @beta_tool
@@ -120,18 +138,22 @@ def synthesize_voice_lines(name: str, voice_id: str, lines: list[dict]) -> str:
     Returns:
         Confirmation string on success, "ERROR: ..." on failure.
     """
+    prefixed_dir = f"{_results['index']:02d}-model"
+    out_dir = MODELS_DIR / prefixed_dir
+    out_dir.mkdir(exist_ok=True)
+    
     audio = []
     for line in lines:
         try:
             mp3_bytes = _elevenlabs_tts(voice_id, line["text"])
         except Exception as e:
             return f"ERROR: voice synthesis failed for line {line['id']}: {e}"
-        out = MODELS_DIR / f"{name}_{line['id']}.mp3"
+        out = out_dir / f"{name}_{line['id']}.mp3"
         out.write_bytes(mp3_bytes)
         audio.append({
             "id": line["id"],
             "text": line["text"],
-            "url": f"/models/{name}_{line['id']}.mp3",
+            "url": f"/models/{prefixed_dir}/{name}_{line['id']}.mp3",
         })
     _results["audio"] = audio
     return f"OK: synthesized {len(audio)} lines."
@@ -155,6 +177,7 @@ def _elevenlabs_tts(voice_id: str, text: str) -> bytes:
 def generate_npc(user_prompt: str) -> dict:
     """Run the agent loop. Returns {"glb_url": str, "audio": [{id, url, text}]}."""
     _results.clear()
+    _results["index"] = _next_index()
     client = anthropic.Anthropic()
     voice_list = "\n".join(f"  - {nm}: {vid}" for nm, vid in VOICES.items())
 
@@ -175,10 +198,18 @@ def generate_npc(user_prompt: str) -> dict:
         raise RuntimeError(
             f"Agent finished without producing both outputs. Got keys: {list(_results)}"
         )
-    return {"glb_url": _results["glb_url"], "audio": _results["audio"]}
+    payload = {"glb_url": _results["glb_url"], "audio": _results["audio"]}
+    # Persist alongside the assets so the frontend can deep-link via ?npc=<name>.
+    out_dir = MODELS_DIR / _results["dir_name"]
+    out_dir.mkdir(exist_ok=True)
+    json_path = out_dir / f"{_results['name']}.json"
+    json_path.write_text(json.dumps(payload, indent=2))
+    
+    # We return the frontend-friendly identifier so it can update the URL
+    payload["npc_id"] = f"{_results['dir_name']}/{_results['name']}"
+    return payload
 
 
 if __name__ == "__main__":
-    import json
     result = generate_npc("Bjorn — a grumpy dwarf blacksmith with a long red beard")
     print(json.dumps(result, indent=2))

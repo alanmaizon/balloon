@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NPC Chatter</title>
+    <title>Balloon</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <style>
         body { margin: 0; font-family: system-ui, sans-serif; }
@@ -25,7 +25,7 @@
 </head>
 <body>
     <div id="ui">
-        <input id="prompt" type="text" placeholder="Describe an NPC: 'grumpy dwarf blacksmith with a red beard'" />
+        <input id="prompt" type="text" placeholder="Describe your character..." />
         <button id="generate">Generate</button>
         <span id="status">Ready.</span>
     </div>
@@ -102,6 +102,31 @@
 
         $generate.addEventListener('click', generate);
         $prompt.addEventListener('keydown', e => { if (e.key === 'Enter') generate(); });
+
+        // Deep-link: ?npc=<name> loads a previously generated NPC's metadata
+        // and renders it without re-running the agent. Browsers may block
+        // autoplay on cold loads — first click anywhere unsticks it.
+        const npcParam = new URLSearchParams(location.search).get('npc');
+        if (npcParam) {
+            $status.textContent = `Loading ${npcParam}...`;
+            
+            // If the npcParam doesn't contain a directory prefix, try 01-model first for backwards compatibility
+            const fetchPath = npcParam.includes('/') ? `/models/${npcParam}.json` : `/models/01-model/${npcParam}.json`;
+            
+            fetch(fetchPath)
+                .then(async r => {
+                    if (r.ok) return r.json();
+                    
+                    // Fallback to root models dir if 01-model failed just in case
+                    if (!npcParam.includes('/')) {
+                        const fallbackRes = await fetch(`/models/${npcParam}.json`);
+                        if (fallbackRes.ok) return fallbackRes.json();
+                    }
+                    return Promise.reject(`HTTP ${r.status}`);
+                })
+                .then(data => { loadNPC(data); $status.textContent = `Loaded ${npcParam}.`; })
+                .catch(e => { $status.textContent = `Could not load "${npcParam}": ${e}`; });
+        }
     </script>
 </body>
 </html>

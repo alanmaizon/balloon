@@ -1,4 +1,4 @@
-"""FastAPI server for NPC Chatter.
+"""FastAPI server for Balloon.
 
 Serves the A-Frame frontend, the generated /models/ assets, and the agent API.
 Single-origin: open http://localhost:8000 — no CORS, no separate dev server.
@@ -13,7 +13,7 @@ import agent
 
 ROOT = Path(__file__).parent.parent
 
-app = FastAPI(title="NPC Chatter")
+app = FastAPI(title="Balloon")
 
 
 class GenerateRequest(BaseModel):

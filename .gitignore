@@ -7,3 +7,4 @@ venv/
 # Generated NPC assets — regenerate, don't commit
 models/*.glb
 models/*.mp3
+models/*.json
