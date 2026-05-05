@@ -1,8 +1,8 @@
-<p align="center">
-  <img src="./assets/media/balloon-logo.gif" alt="Balloon" width="480" />
-</p>
-
 # Balloon
+
+<p align="center">
+  <img src="./assets/media/balloon-logo.png" alt="Balloon" width="480" />
+</p>
 
 > One prompt → a 3D character standing in front of you in VR, talking.
 
