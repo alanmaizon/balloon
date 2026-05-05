@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NPC Chatter</title>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <style>
+        body { margin: 0; font-family: system-ui, sans-serif; }
+        #ui {
+            position: absolute; top: 0; left: 0; right: 0; z-index: 100;
+            padding: 16px; background: rgba(0,0,0,0.75); color: white;
+            display: flex; gap: 12px; align-items: center;
+        }
+        #prompt { flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #555;
+                  background: #222; color: white; font-size: 14px; }
+        #generate { padding: 8px 16px; border-radius: 4px; border: 0;
+                    background: #c45a3a; color: white; font-weight: bold; cursor: pointer; }
+        #generate:disabled { opacity: 0.5; cursor: wait; }
+        #status { font-size: 13px; color: #aaa; min-width: 200px; }
+        #lines { position: absolute; bottom: 0; left: 0; right: 0; z-index: 100;
+                 padding: 12px; background: rgba(0,0,0,0.75); color: white; font-size: 13px; }
+        #lines button { margin: 2px; padding: 4px 8px; background: #333; color: white;
+                        border: 1px solid #555; border-radius: 3px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <input id="prompt" type="text" placeholder="Describe an NPC: 'grumpy dwarf blacksmith with a red beard'" />
+        <button id="generate">Generate</button>
+        <span id="status">Ready.</span>
+    </div>
+
+    <a-scene xr-mode-ui="enabled: true" background="color: #1a1a24">
+        <a-sky color="#1a1a24"></a-sky>
+        <a-plane position="0 0 0" rotation="-90 0 0" width="20" height="20" color="#2a2a35"></a-plane>
+        <a-light type="ambient" color="#888"></a-light>
+        <a-light type="directional" position="2 4 3" intensity="0.8"></a-light>
+
+        <a-entity id="npc" position="0 0 -3"></a-entity>
+
+        <a-camera position="0 1.6 0" wasd-controls="acceleration: 30">
+            <a-cursor color="white"></a-cursor>
+        </a-camera>
+    </a-scene>
+
+    <div id="lines"></div>
+
+    <script>
+        const $prompt = document.getElementById('prompt');
+        const $generate = document.getElementById('generate');
+        const $status = document.getElementById('status');
+        const $lines = document.getElementById('lines');
+        const $npc = document.getElementById('npc');
+
+        async function generate() {
+            const prompt = $prompt.value.trim();
+            if (!prompt) { $prompt.focus(); return; }
+
+            $generate.disabled = true;
+            $status.textContent = 'Calling Claude... (this takes 15-30s)';
+            $lines.innerHTML = '';
+
+            try {
+                const res = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt }),
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({ detail: res.statusText }));
+                    throw new Error(err.detail || `HTTP ${res.status}`);
+                }
+                const data = await res.json();
+                loadNPC(data);
+                $status.textContent = `Loaded. ${data.audio.length} voice lines ready.`;
+            } catch (e) {
+                $status.textContent = `Error: ${e.message}`;
+            } finally {
+                $generate.disabled = false;
+            }
+        }
+
+        function loadNPC({ glb_url, audio }) {
+            // Replace the model. setAttribute on gltf-model triggers a fresh load
+            // even if the URL is the same as before — no need to clear children.
+            $npc.setAttribute('gltf-model', `url(${glb_url})`);
+
+            // Attach spatial audio: greeting plays automatically from the NPC's
+            // position. Other lines render as click-to-play buttons below.
+            const greeting = audio.find(a => /greet/i.test(a.id)) || audio[0];
+            $npc.setAttribute('sound', `src: url(${greeting.url}); positional: true; autoplay: true; volume: 1`);
+
+            $lines.innerHTML = audio.map(a =>
+                `<button data-url="${a.url}" title="${a.text.replace(/"/g, '&quot;')}">${a.id}</button>`
+            ).join(' ');
+            $lines.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    $npc.setAttribute('sound', `src: url(${btn.dataset.url}); positional: true; autoplay: true; volume: 1`);
+                });
+            });
+        }
+
+        $generate.addEventListener('click', generate);
+        $prompt.addEventListener('keydown', e => { if (e.key === 'Enter') generate(); });
+    </script>
+</body>
+</html>

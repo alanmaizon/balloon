@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Generated NPC assets — regenerate, don't commit
+models/*.glb
+models/*.mp3
