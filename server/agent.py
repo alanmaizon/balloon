@@ -47,7 +47,7 @@ VOICES = {
 
 SYSTEM_PROMPT = """You are a procedural NPC builder. Given a character description from the user, do this:
 
-1. Call `build_3d_model` with a unique snake_case `name` and a `bpy_script` that constructs the character.
+1. Call `build_3d_model` with a unique snake_case `name` (format strictly as `<species>_<class>_<trait>`, e.g., `goblin_merchant_greedy`) and a `bpy_script` that constructs the character.
 2. Call `synthesize_voice_lines` with the same `name`, a `voice_id` from the list below, and 3-5 dialogue lines.
 
 Both tools must succeed. Return a one-sentence summary at the end.

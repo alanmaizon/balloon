@@ -15,7 +15,9 @@
                   background: #222; color: white; font-size: 14px; }
         #generate { padding: 8px 16px; border-radius: 4px; border: 0;
                     background: #c45a3a; color: white; font-weight: bold; cursor: pointer; }
-        #generate:disabled { opacity: 0.5; cursor: wait; }
+        #generate:disabled, #surprise:disabled { opacity: 0.5; cursor: wait; }
+        #surprise { padding: 8px 16px; border-radius: 4px; border: 0;
+                    background: #3ac496; color: white; font-weight: bold; cursor: pointer; }
         #status { font-size: 13px; color: #aaa; min-width: 200px; }
         #lines { position: absolute; bottom: 0; left: 0; right: 0; z-index: 100;
                  padding: 12px; background: rgba(0,0,0,0.75); color: white; font-size: 13px; }
@@ -27,6 +29,7 @@
     <div id="ui">
         <input id="prompt" type="text" placeholder="Describe your character..." />
         <button id="generate">Generate</button>
+        <button id="surprise">Surprise Me</button>
         <span id="status">Ready.</span>
     </div>
 
@@ -48,6 +51,7 @@
     <script>
         const $prompt = document.getElementById('prompt');
         const $generate = document.getElementById('generate');
+        const $surprise = document.getElementById('surprise');
         const $status = document.getElementById('status');
         const $lines = document.getElementById('lines');
         const $npc = document.getElementById('npc');
@@ -57,6 +61,7 @@
             if (!prompt) { $prompt.focus(); return; }
 
             $generate.disabled = true;
+            $surprise.disabled = true;
             $status.textContent = 'Calling Claude... (this takes 15-30s)';
             $lines.innerHTML = '';
 
@@ -77,6 +82,7 @@
                 $status.textContent = `Error: ${e.message}`;
             } finally {
                 $generate.disabled = false;
+                $surprise.disabled = false;
             }
         }
 
@@ -85,11 +91,8 @@
             // even if the URL is the same as before — no need to clear children.
             $npc.setAttribute('gltf-model', `url(${glb_url})`);
 
-            // Attach spatial audio: greeting plays automatically from the NPC's
-            // position. Other lines render as click-to-play buttons below.
-            const greeting = audio.find(a => /greet/i.test(a.id)) || audio[0];
-            $npc.setAttribute('sound', `src: url(${greeting.url}); positional: true; autoplay: true; volume: 1`);
-
+            // Render all lines as click-to-play buttons below.
+            // None will play automatically on load to ensure a silent start.
             $lines.innerHTML = audio.map(a =>
                 `<button data-url="${a.url}" title="${a.text.replace(/"/g, '&quot;')}">${a.id}</button>`
             ).join(' ');
@@ -101,6 +104,10 @@
         }
 
         $generate.addEventListener('click', generate);
+        $surprise.addEventListener('click', () => {
+            $prompt.value = "Create a completely random fantasy NPC with a unique species, profession, and distinct personality. Pick any suitable voice. Surprise me!";
+            generate();
+        });
         $prompt.addEventListener('keydown', e => { if (e.key === 'Enter') generate(); });
 
         // Deep-link: ?npc=<name> loads a previously generated NPC's metadata
